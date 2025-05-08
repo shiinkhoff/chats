@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "958789012571",
+    "project_id": "tatalk-53ba7",
+    "storage_bucket": "tatalk-53ba7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:958789012571:android:151f6bfbd5c91804abc37e",
+        "android_client_info": {
+          "package_name": "com.example.chatdansosmed"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPr4_r1HHS-hHW2wVUrfK_uiM4W2QnuVI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
