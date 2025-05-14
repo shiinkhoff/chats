@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:chatdansosmed/homepage/home.dart';
 import 'package:chatdansosmed/login/forgotpw1.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -38,33 +42,78 @@ class _LoginState extends State<Login> {
         password: passwordController.text.trim(),
       );
 
-      // Jika login berhasil, navigasikan ke HomePage
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => HomePage()),
-      );
+      User? user = userCredential.user;
+
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (!doc.exists) {
+          _showErrorDialog('User tidak ditemukan di Firestore.');
+          return;
+        }
+
+        final data = doc.data();
+        final laravelIdRaw = data?['laravel_id'];
+        final int laravelId = laravelIdRaw is int
+            ? laravelIdRaw
+            : int.tryParse(laravelIdRaw.toString()) ?? 0;
+
+        if (laravelId == 0) {
+          _showErrorDialog('ID Laravel tidak valid.');
+          return;
+        }
+
+        final bool apiLoginSuccess = await _loginToLaravelApi(laravelId);
+
+        if (apiLoginSuccess) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => HomePage()),
+          );
+        } else {
+          _showErrorDialog('Login ke Laravel API gagal.');
+        }
+      }
     } catch (e) {
-      // Menampilkan error
       String errorMessage = e.toString();
 
       if (errorMessage.contains('recaptcha')) {
         errorMessage = 'Recaptcha verification failed. Please try again.';
       }
 
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Login Failed'),
-          content: Text(errorMessage),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+      _showErrorDialog(errorMessage);
     }
+  }
+
+// Fungsi login ke Laravel API
+  Future<bool> _loginToLaravelApi(int userId) async {
+    final response = await http.post(
+      Uri.parse('http://10.0.2.2:8000/api/users'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'id': userId}),
+    );
+
+    return response.statusCode == 200;
+  }
+
+// Fungsi menampilkan dialog error
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

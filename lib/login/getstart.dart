@@ -1,5 +1,6 @@
 import 'package:chatdansosmed/homepage/home.dart';
 import 'package:chatdansosmed/login/tampilanlogin.dart';
+import 'package:chatdansosmed/services/api_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,22 @@ class GetStartPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    void _showErrorDialog(String message) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Error'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+
     // Controllers for text fields
     final TextEditingController usernameController = TextEditingController();
     final TextEditingController phoneController = TextEditingController();
@@ -22,8 +39,16 @@ class GetStartPage extends StatelessWidget {
       final email = emailController.text.trim();
       final password = passwordController.text.trim();
 
+      if (username.isEmpty ||
+          phone.isEmpty ||
+          email.isEmpty ||
+          password.isEmpty) {
+        _showErrorDialog("Semua kolom harus diisi.");
+        return;
+      }
+
       try {
-        // Daftar user ke Firebase Auth
+        // Register user ke Firebase Authentication
         UserCredential userCredential = await FirebaseAuth.instance
             .createUserWithEmailAndPassword(email: email, password: password);
 
@@ -44,43 +69,44 @@ class GetStartPage extends StatelessWidget {
             'createdAt': FieldValue.serverTimestamp(),
           });
 
-          // Tampilkan pesan bahwa email verifikasi telah dikirim
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Email Verification Sent'),
-              content: const Text(
-                  'A verification email has been sent. Please verify your email before logging in.'),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const TampilanLogin()),
-                    );
-                  },
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
+          // Register user ke Laravel API
+          final laravelUserSuccess = await ApiService.registerUserToLaravel(
+            name: username,
+            username: username,
+            email: email,
+            noHp: phone,
           );
+
+          if (laravelUserSuccess) {
+            // Berhasil register ke Laravel, tampilkan dialog
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Email Verification Sent'),
+                content: const Text(
+                    'A verification email has been sent. Please verify your email before logging in.'),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const TampilanLogin()),
+                      );
+                    },
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            );
+          } else {
+            // Gagal register ke Laravel, tampilkan error
+            _showErrorDialog("Gagal register ke Laravel API.");
+          }
         }
       } catch (e) {
-        // Tampilkan pesan error
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Error'),
-            content: Text(e.toString()),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
+        // Tangani error saat registrasi
+        _showErrorDialog(e.toString());
       }
     }
 
