@@ -1,38 +1,77 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/thread.dart';
+import 'package:path/path.dart';
+import 'package:http_parser/http_parser.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.100.224:8000/api';
+  static const String baseUrl = 'http://192.168.204.222:8000/api';
 
-  static Future<bool> createThread(int userId, String content) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/threads'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'user_id': userId, 'content': content}),
-    );
-
-    return response.statusCode == 201 || response.statusCode == 200;
+  Future<void> saveUserId(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_id', userId);
   }
 
   static Future<List<Thread>> fetchThreads() async {
     final response = await http.get(Uri.parse('$baseUrl/threads'));
+
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as List;
-      return data.map((e) => Thread.fromJson(e)).toList();
+      final List data = json.decode(response.body);
+
+      List<Thread> threads = data.map((json) => Thread.fromJson(json)).toList();
+
+      // Urutkan dari yang terbaru ke yang lama
+      threads.sort((a, b) =>
+          DateTime.parse(b.createdAt!).compareTo(DateTime.parse(a.createdAt!)));
+
+      return threads;
     } else {
-      throw Exception('Gagal memuat data threads');
+      throw Exception('Failed to load threads');
     }
   }
 
-  static Future<bool> registerUserToLaravel({
-    required String name,
-    required String username,
-    required String email,
-    required String noHp,
-  }) async {
+  static Future<bool> createThread(String userId, String content,
+      [File? image]) async {
+    var uri = Uri.parse('$baseUrl/threads');
+    var request = http.MultipartRequest('POST', uri);
+    request.fields['user_id'] = userId;
+    request.fields['content'] = content;
+
+    if (image != null) {
+      var stream = http.ByteStream(image.openRead());
+      var length = await image.length();
+      var multipartFile = http.MultipartFile(
+        'gambar',
+        stream,
+        length,
+        filename: basename(image.path),
+        contentType: MediaType('image', 'jpeg'), // Ganti jika bukan jpeg
+      );
+      request.files.add(multipartFile);
+    }
+
+    var response = await request.send();
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return true;
+    } else {
+      final respStr = await response.stream.bytesToString();
+      print('Failed to post thread: ${response.statusCode}');
+      print('Response body: $respStr'); // ← Tambahkan ini untuk debug
+
+      return false;
+    }
+  }
+
+  static Future<bool> registerUserToLaravel(
+      {required String name,
+      required String username,
+      required String email,
+      required String noHp,
+      required String password}) async {
     final response = await http.post(
       Uri.parse('$baseUrl/users'),
       headers: {'Content-Type': 'application/json'},
@@ -41,12 +80,13 @@ class ApiService {
         'username': username,
         'email': email,
         'no_hp': noHp,
+        'password': password
       }),
     );
 
     if (response.statusCode == 201 || response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      final int laravelId =
+      final String laravelId =
           data['data']['id']; // Ambil ID dari response Laravel
 
       // Simpan laravel_id ke Firestore

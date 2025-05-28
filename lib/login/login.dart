@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -57,18 +58,19 @@ class _LoginState extends State<Login> {
 
         final data = doc.data();
         final laravelIdRaw = data?['laravel_id'];
-        final int laravelId = laravelIdRaw is int
-            ? laravelIdRaw
-            : int.tryParse(laravelIdRaw.toString()) ?? 0;
+        final String laravelId = laravelIdRaw?.toString() ?? '';
 
-        if (laravelId == 0) {
+        if (laravelId.isEmpty) {
           _showErrorDialog('ID Laravel tidak valid.');
           return;
         }
 
-        final bool apiLoginSuccess = await _loginToLaravelApi(laravelId);
+        final apiLoginSuccess = await _loginToLaravelApi(laravelId);
 
         if (apiLoginSuccess) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_id', laravelId);
+          await prefs.setString('firebase_uid', user.uid);
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => HomePage()),
@@ -89,12 +91,15 @@ class _LoginState extends State<Login> {
   }
 
 // Fungsi login ke Laravel API
-  Future<bool> _loginToLaravelApi(int userId) async {
+  Future<bool> _loginToLaravelApi(String id) async {
     final response = await http.post(
-      Uri.parse('http://10.0.2.2:8000/api/users'),
+      Uri.parse('http://192.168.204.222:8000/api/login-id'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'id': userId}),
+      body: jsonEncode({'id': id}),
     );
+
+    debugPrint('Laravel status code: ${response.statusCode}');
+    debugPrint('Laravel response: ${response.body}');
 
     return response.statusCode == 200;
   }

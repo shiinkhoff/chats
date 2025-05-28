@@ -1,11 +1,12 @@
 import 'package:chatdansosmed/login/splash.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-
+  timeago.setLocaleMessages('id', timeago.IdMessages());
   runApp(const MyApp());
 }
 

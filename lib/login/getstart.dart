@@ -75,29 +75,14 @@ class GetStartPage extends StatelessWidget {
             username: username,
             email: email,
             noHp: phone,
+            password: password,
           );
 
           if (laravelUserSuccess) {
-            // Berhasil register ke Laravel, tampilkan dialog
-            showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Email Verification Sent'),
-                content: const Text(
-                    'A verification email has been sent. Please verify your email before logging in.'),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const TampilanLogin()),
-                      );
-                    },
-                    child: const Text('OK'),
-                  ),
-                ],
-              ),
+            // Berhasil register ke Laravel, arahkan langsung ke HomePage
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const HomePage()),
             );
           } else {
             // Gagal register ke Laravel, tampilkan error
